@@ -18,11 +18,49 @@ st.markdown("Plan your perfect trip with AI-powered recommendations")
 # Voice Command Section
 st.divider()
 st.subheader("🎤 Voice Commands")
-voice_input = st.text_input("Speak or type your request", placeholder="e.g., 'What if it rains?', 'Plan a trip to Delhi', 'Explain the itinerary'")
+
+# Text input (existing)
+voice_input = st.text_input("Speak or type your request", key="voice_input", placeholder="e.g., 'What if it rains?', 'Plan a trip to Delhi', 'Explain the itinerary'")
+
+# Microphone input (new)
+import streamlit.components.v1 as components
+
+voice_html = """
+<button onclick="startRecognition()">🎤 Speak</button>
+<p id="transcript"></p>
+
+<script>
+function startRecognition() {
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = 'en-US';
+    recognition.start();
+
+    recognition.onresult = function(event) {
+        const transcript = event.results[0][0].transcript;
+        document.getElementById("transcript").innerText = transcript;
+
+        fetch("http://localhost:8000/voice-command", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ text: transcript })
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log(data);
+        });
+    };
+}
+</script>
+"""
+
+components.html(voice_html, height=150)
+
 col1, col2 = st.columns(2)
 
 with col1:
-    if st.button("Submit Voice Command", type="primary"):
+    if st.button("Submit Voice Command", key="submit_voice_cmd", type="primary"):
         if voice_input.strip():
             with st.spinner("Processing your request..."):
                 try:
@@ -55,7 +93,7 @@ with col1:
             st.warning("Please enter a command first.")
 
 with col2:
-    if st.button("Adjust for Weather"):
+    if st.button("Adjust for Weather", key="adjust_weather_1"):
         if 'trip_data' in st.session_state:
             with st.spinner("Adjusting itinerary for weather..."):
                 try:
@@ -85,16 +123,17 @@ with col2:
 with st.sidebar:
     st.header("Trip Configuration")
     
-    city = st.text_input("City", "Delhi")
+    city = st.text_input("City", key="city_input", value="Delhi")
     interests = st.multiselect(
         "Interests",
         ["history", "food", "culture", "nature", "shopping", "architecture", "museums"],
+        key="interests_select",
         default=["history", "food"]
     )
-    days = st.slider("Number of days", 1, 7, 2)
-    pace = st.selectbox("Pace", ["relaxed", "moderate", "packed"], index=1)
+    days = st.slider("Number of days", key="days_slider", min_value=1, max_value=7, value=2)
+    pace = st.selectbox("Pace", ["relaxed", "moderate", "packed"], key="pace_select", index=1)
     
-    if st.button("Generate Itinerary"):
+    if st.button("Generate Itinerary", key="generate_itinerary_btn"):
         if not interests:
             st.error("Please select at least one interest.")
         else:
@@ -181,12 +220,12 @@ if 'trip_data' in st.session_state:
     col1, col2 = st.columns(2)
     
     with col1:
-        day_to_edit = st.number_input("Day to edit", min_value=1, max_value=len(st.session_state.trip_data['days']), value=1)
+        day_to_edit = st.number_input("Day to edit", key="day_to_edit_input", min_value=1, max_value=len(st.session_state.trip_data['days']), value=1)
     
     with col2:
-        new_pace = st.selectbox("New pace for this day", ["relaxed", "moderate", "packed"])
+        new_pace = st.selectbox("New pace for this day", ["relaxed", "moderate", "packed"], key="new_pace_select")
     
-    if st.button("Update Day"):
+    if st.button("Update Day", key="update_day_btn"):
         with st.spinner(f"Updating day {day_to_edit} pace..."):
             try:
                 api_url = os.getenv("BACKEND_URL", "http://localhost:8000")
@@ -213,7 +252,7 @@ if 'trip_data' in st.session_state:
     col1, col2 = st.columns(2)
     
     with col1:
-        if st.button("Get Weather Forecast"):
+        if st.button("Get Weather Forecast", key="get_weather_btn"):
             with st.spinner("Fetching weather information..."):
                 try:
                     api_url = os.getenv("BACKEND_URL", "http://localhost:8000")
@@ -229,7 +268,7 @@ if 'trip_data' in st.session_state:
                     st.error(f"Failed to connect to backend: {str(e)}")
     
     with col2:
-        if st.button("Adjust for Weather"):
+        if st.button("Adjust for Weather", key="adjust_weather_2"):
             if 'trip_data' in st.session_state:
                 with st.spinner("Adjusting itinerary for weather..."):
                     try:
@@ -270,7 +309,7 @@ if 'trip_data' in st.session_state:
     st.divider()
     st.subheader("📊 Evaluation Panel")
     
-    if st.button("Run Evaluations"):
+    if st.button("Run Evaluations", key="run_evaluations_btn"):
         with st.spinner("Running evaluations..."):
             try:
                 api_url = os.getenv("BACKEND_URL", "http://localhost:8000")
@@ -341,6 +380,35 @@ if 'trip_data' in st.session_state:
                 st.error(f"Edit correctness evaluation failed: {edit_result['error']}")
 else:
     st.info("No active trip to evaluate. Generate a trip first to run evaluations.")
+
+# Export to n8n Section
+if 'trip_data' in st.session_state:
+    st.divider()
+    st.subheader("📤 Export Itinerary")
+    
+    email = st.text_input("Email address", key="email_export_input", placeholder="your.email@example.com")
+    
+    if st.button("Send PDF via Email", key="send_pdf_btn"):
+        if email.strip():
+            with st.spinner("Sending itinerary to n8n..."):
+                try:
+                    api_url = os.getenv("BACKEND_URL", "http://localhost:8000")
+                    response = requests.post(f"{api_url}/export-itinerary", json={
+                        "email": email
+                    })
+                    
+                    if response.status_code == 200:
+                        result = response.json()
+                        if result.get("status") == "sent":
+                            st.success("Itinerary sent successfully! Check your email for the PDF.")
+                        else:
+                            st.error(f"Error: {result.get('error', 'Unknown error')}")
+                    else:
+                        st.error(f"Error: {response.status_code} - {response.text}")
+                except Exception as e:
+                    st.error(f"Failed to send itinerary: {str(e)}")
+        else:
+            st.warning("Please enter an email address.")
 
 # Add footer
 st.divider()

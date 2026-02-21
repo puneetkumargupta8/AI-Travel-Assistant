@@ -11,6 +11,8 @@ from app.evals.grounding import evaluate_grounding
 from app.intents import classify_intent
 from app.mcp.weather import get_delhi_weather
 import copy
+import requests
+import os
 
 app = FastAPI()
 orchestrator = Orchestrator()
@@ -186,3 +188,38 @@ def voice_command(payload: dict = Body(...)):
 @app.get("/test-weather")
 def test_weather():
     return get_delhi_weather()
+
+
+@app.post("/export-itinerary")
+def export_itinerary(payload: dict = Body(...)):
+
+    email = payload.get("email")
+
+    if not orchestrator.current_trip:
+        return {"error": "No active trip to export."}
+
+    webhook_url = os.getenv("N8N_WEBHOOK_URL")
+
+    if not webhook_url:
+        return {"error": "N8N webhook URL not configured."}
+
+    try:
+        response = requests.post(
+            webhook_url,
+            json={
+                "email": email,
+                "trip": orchestrator.current_trip.dict()
+            },
+            timeout=10
+        )
+
+        return {
+            "status": "sent",
+            "n8n_response": response.text
+        }
+
+    except Exception as e:
+        return {
+            "error": "Failed to send to n8n",
+            "details": str(e)
+        }
