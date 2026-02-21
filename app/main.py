@@ -9,6 +9,7 @@ from app.evals.edit_correctness import evaluate_edit_correctness
 from app.evals.feasibility import evaluate_feasibility
 from app.evals.grounding import evaluate_grounding
 from app.intents import classify_intent
+from app.mcp.weather import get_delhi_weather
 import copy
 
 app = FastAPI()
@@ -124,4 +125,64 @@ def voice_command(payload: dict = Body(...)):
 
     intent_data = classify_intent(user_text)
 
-    return intent_data
+    if "error" in intent_data:
+        return intent_data
+
+    intent = intent_data.get("intent")
+
+    # PLAN FLOW
+    if intent == "PLAN":
+        trip = orchestrator.plan_trip(
+            city=intent_data.get("city"),
+            interests=intent_data.get("interests"),
+            days=intent_data.get("days"),
+            pace=intent_data.get("pace")
+        )
+
+        return {
+            "intent": "PLAN",
+            "trip": trip
+        }
+
+    # EDIT FLOW
+    elif intent == "EDIT_DAY_PACE":
+        if not orchestrator.current_trip:
+            return {"error": "No active trip to edit."}
+
+        updated_trip = orchestrator.edit_day_pace(
+            day_number=intent_data.get("day"),
+            new_pace=intent_data.get("pace")
+        )
+
+        return {
+            "intent": "EDIT_DAY_PACE",
+            "trip": updated_trip
+        }
+
+    # WEATHER ADJUSTMENT FLOW (check for rain-related query)
+    elif intent == "EXPLAIN" and "rain" in user_text.lower():
+        updated_trip = orchestrator.apply_weather_adjustment()
+
+        return {
+            "intent": "WEATHER_ADJUSTMENT",
+            "trip": updated_trip
+        }
+
+    # EXPLAIN FLOW
+    elif intent == "EXPLAIN":
+        explanation = orchestrator.explain(
+            target=intent_data.get("target")
+        )
+
+        return {
+            "intent": "EXPLAIN",
+            "explanation": explanation
+        }
+
+    else:
+        return {"error": "Unsupported intent", "intent_data": intent_data}
+
+
+@app.get("/test-weather")
+def test_weather():
+    return get_delhi_weather()
