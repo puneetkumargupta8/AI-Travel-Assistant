@@ -23,7 +23,8 @@ services:
 
       N8N_PROTOCOL=https
 
-      WEBHOOK_URL=https://your-n8n-url.onrender.com/
+      WEBHOOK_URL=https://ai-travel-assistant-0qol.onrender.com
+
 
       
     volumes:
