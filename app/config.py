@@ -16,6 +16,9 @@ class Config:
     REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "5"))
     MAX_RETRIES = int(os.getenv("MAX_RETRIES", "1"))
     
+    # API Keys
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+    
     # Backend Configuration
     BACKEND_HOST = os.getenv("BACKEND_HOST", "localhost")
     BACKEND_PORT = int(os.getenv("BACKEND_PORT", "8000"))

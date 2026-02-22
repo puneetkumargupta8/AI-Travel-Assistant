@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  fastapi:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    restart: unless-stopped
+    depends_on:
+      - n8n
+    networks:
+      - travel-network
+
+  n8n:
+    image: n8nio/n8n
+    ports:
+      - "5678:5678"
+    environment:
+      # - N8N_SECURE_COOKIE=false
+      N8N_SECURE_COOKIE=true
+
+      N8N_PROTOCOL=https
+
+      WEBHOOK_URL=https://your-n8n-url.onrender.com/
+
+      
+    volumes:
+      - ./n8n_data:/home/node/.n8n
+    restart: unless-stopped
+    networks:
+      - travel-network
+
+networks:
+  travel-network:
+    driver: bridge
